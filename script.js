@@ -68,36 +68,158 @@ document.querySelectorAll('[data-animate]').forEach(el => {
   observer.observe(el);
 });
 
-// ===== WAITLIST FORM HANDLING =====
-const handleFormSubmit = async (formId, emailId) => {
+// ===== BACKEND CONFIGURATION =====
+// Google Apps Script backend URL
+const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbwLWVM6YOxkwtBAFdeN0VydknOhPjboeY4jTDpCtX5-vIoareupt88jQ3IgExTuWX8f/exec';
+// Fallback: FormSubmit.co (works without any setup, just sends email)
+const FORMSUBMIT_URL = 'https://formsubmit.co/ajax/support@test-in-prod.com';
+
+// ===== UNIFIED FORM SUBMISSION =====
+function validateEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+async function submitToBackend(formData) {
+  const url = BACKEND_URL || FORMSUBMIT_URL;
+  const isBackend = !!BACKEND_URL;
+
+  // Add FormSubmit-specific fields if using fallback
+  if (!isBackend) {
+    formData._subject = formData._subject || 'New Submission - Test in Prod';
+  }
+
+  if (isBackend) {
+    // Google Apps Script returns 302 redirect on successful POST.
+    // Using redirect:'manual' catches this as an opaque-redirect (status 0),
+    // which confirms the script executed. We treat this as success.
+    const response = await fetch(url, {
+      method: 'POST',
+      redirect: 'manual',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(formData)
+    });
+    // status 0 with type 'opaqueredirect' = GAS processed it and redirected (success)
+    // status 200 = direct success response
+    if (response.status === 0 || response.ok) {
+      return { success: true };
+    }
+    throw new Error('Submission failed');
+  } else {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(formData)
+    });
+    if (!response.ok) throw new Error('Submission failed');
+    return await response.json();
+  }
+}
+
+function showSuccess(button, form, message) {
+  button.textContent = message;
+  button.style.background = 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)';
+  button.style.boxShadow = '0 4px 20px rgba(34, 197, 94, 0.4)';
+  if (form.reset) form.reset();
+}
+
+function showError(button, message) {
+  button.textContent = message || 'Error. Try Again.';
+  button.style.background = '#ef4444';
+}
+
+function resetButton(button, originalText) {
+  button.textContent = originalText;
+  button.style.background = '';
+  button.style.boxShadow = '';
+  button.disabled = false;
+}
+
+// ===== WAITLIST FORMS (email-only) =====
+function setupWaitlistForm(formId, emailId, formType) {
   const form = document.getElementById(formId);
   const emailInput = document.getElementById(emailId);
-  
+
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = emailInput.value;
-    
-    // Show success state
+    if (!validateEmail(email)) { alert('Please enter a valid email address.'); return; }
+
     const button = form.querySelector('button[type="submit"]');
     const originalText = button.textContent;
-    
-    button.textContent = 'Added! 🎉';
-    button.style.background = 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)';
-    emailInput.value = '';
-    
-    // Reset after 3 seconds
-    setTimeout(() => {
-      button.textContent = originalText;
-      button.style.background = '';
-    }, 3000);
-    
-    // Here you would normally send to your backend
-    console.log('Waitlist signup:', email);
-  });
-};
+    button.textContent = 'Submitting...';
+    button.disabled = true;
 
-handleFormSubmit('waitlistForm', 'waitlistEmail');
-handleFormSubmit('footerForm', 'footerEmail');
+    try {
+      await submitToBackend({ email, form_type: formType, _subject: `New ${formType === 'waitlist' ? 'Waitlist' : 'Early Access'} Signup` });
+      showSuccess(button, form, 'Added! 🎉');
+      emailInput.value = '';
+    } catch (error) {
+      console.error(`${formType} error:`, error);
+      showError(button);
+    }
+    setTimeout(() => resetButton(button, originalText), 3000);
+  });
+}
+
+setupWaitlistForm('waitlistForm', 'waitlistEmail', 'waitlist');
+setupWaitlistForm('footerForm', 'footerEmail', 'early_access');
+
+// ===== DEMO REQUEST FORM =====
+const demoForm = document.getElementById('demoForm');
+demoForm?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('demoEmail').value;
+  if (!validateEmail(email)) { alert('Please enter a valid work email.'); return; }
+
+  const button = demoForm.querySelector('button[type="submit"]');
+  const originalText = button.textContent;
+  button.textContent = 'Sending...';
+  button.disabled = true;
+
+  try {
+    await submitToBackend({
+      form_type: 'demo_request',
+      name: document.getElementById('demoName').value,
+      email,
+      company: document.getElementById('demoCompany').value,
+      _subject: 'New Demo Request - Test in Prod'
+    });
+    showSuccess(button, demoForm, 'Request Sent! 🎉');
+  } catch (error) {
+    console.error('Demo request error:', error);
+    showError(button);
+  }
+  setTimeout(() => resetButton(button, originalText), 3000);
+});
+
+// ===== CONTACT FORM =====
+const contactForm = document.getElementById('contactForm');
+contactForm?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('contactEmail').value;
+  if (!validateEmail(email)) { alert('Please enter a valid email address.'); return; }
+
+  const button = contactForm.querySelector('button[type="submit"]');
+  const originalText = button.textContent;
+  button.textContent = 'Sending...';
+  button.disabled = true;
+
+  try {
+    await submitToBackend({
+      form_type: 'contact',
+      name: document.getElementById('contactName').value,
+      email,
+      subject: document.getElementById('contactSubject').value,
+      message: document.getElementById('contactMessage').value,
+      _subject: 'New Contact Message - Test in Prod'
+    });
+    showSuccess(button, contactForm, 'Message Sent! 🎉');
+  } catch (error) {
+    console.error('Contact form error:', error);
+    showError(button);
+  }
+  setTimeout(() => resetButton(button, originalText), 3000);
+});
 
 // ===== NAV BACKGROUND ON SCROLL =====
 let lastScroll = 0;
