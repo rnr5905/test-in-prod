@@ -7,8 +7,8 @@
 
 # Configuration
 PROJECT_ID="enduring-fold-485615-t0"
-REGION="asia-south1"
-REPO="testinprod"
+REGION="asia-east1"
+REPO="cloud-run-source-deploy"
 IMAGE_NAME="testinprod-website"
 
 # Get version from argument or use default
