@@ -21,10 +21,9 @@ echo "🏗️  Building and pushing image..."
 echo "   Image: ${IMAGE_PATH}"
 echo ""
 
-# --------------------------------------------
 # Navigate to project directory
 # --------------------------------------------
-cd /Users/narsimha.reddy/Documents/test/webs
+cd "$(dirname "$0")/.."
 
 # --------------------------------------------
 # Build and push using Cloud Build

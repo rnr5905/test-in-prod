@@ -1,0 +1,14 @@
+{
+  "name": "test-in-prod-site",
+  "version": "1.0.0",
+  "description": "Landing page for Test in Prod",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}
